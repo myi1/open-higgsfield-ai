@@ -15,20 +15,36 @@ Note: the account is currently on Clerk's **Development** instance. That is fine
 for building, but it carries a development banner and low limits. Switch to
 **Production** at deploy time; it requires the live domain.
 
-## 2. MuAPI accepts external (Vercel Blob) image URLs — OPEN
+## 2. MuAPI accepts external image URLs — RESOLVED
 
-Not yet tested. Needs one real call with the MuAPI key, which only Yahya holds.
-Command is in the handover notes.
+**Accepted: YES.** Verified 2026-09-07 with a real generation: MuAPI fetched a
+photo from an external host, edited it, and returned the result for $0.02.
 
-Consequence if NO: uploads proxy through the server, capped at 4.5MB, and
-`uploadFile` in `packages/studio/src/muapi.js` reverts to `/api/v1/upload_file`.
+Two things learned on the way:
+- **Wikimedia blocks MuAPI's fetcher.** The first attempt failed with "failed to
+  transfer the provided image", which reads like a rejection of external URLs but
+  is that one host refusing bots. Any ordinary CDN works.
+- The i2i endpoints take `images_list` (an array), not `image_url`. The app already
+  handles this — every one of the 57 i2i and 61 i2v models declares its own
+  `imageField` — so no change was needed.
 
-## 3. Claude Desktop accepts a hosted MCP with a static bearer token — OPEN
+## 3. Claude Desktop accepts a hosted MCP with a static bearer token — RESOLVED
 
-Not yet tested; needs the deployed URL. Low risk: Claude Code accepts the header,
-and that path is proven working against a local server.
+**Accepted: YES.** Verified 2026-09-07 — the connector shows as connected.
 
-Consequence if NO: `/connect` shows Desktop users a small local wrapper instead.
+But the setup is a **form, not a JSON file**, which `/connect` originally got wrong.
+The four values Desktop asks for are:
+
+| Field | Value |
+|---|---|
+| Name | Yahya AI Studio |
+| Remote MCP server URL | `https://studio.yahya-ai.com/mcp` |
+| Authentication | **None** — we use an API key, not OAuth |
+| Additional request header | `Authorization` = `Bearer <their ohf_ token>` |
+
+Claude's dialog auto-detects "Always required" because our endpoint returns 401
+without a token. That detection is wrong for us: pick **None** and supply the
+header. `/connect` now spells this out field by field.
 
 ## Also settled while building
 

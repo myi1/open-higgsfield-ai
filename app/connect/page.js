@@ -18,18 +18,8 @@ export default async function ConnectPage() {
     `claude mcp add --transport http higgsfield ${origin}/mcp ` +
     `--header "Authorization: Bearer ${appUser.mcpToken}"`;
 
-  const desktopJson = JSON.stringify(
-    {
-      mcpServers: {
-        higgsfield: {
-          url: `${origin}/mcp`,
-          headers: { Authorization: `Bearer ${appUser.mcpToken}` },
-        },
-      },
-    },
-    null,
-    2,
-  );
+  const mcpUrl = `${origin}/mcp`;
+  const authHeader = `Bearer ${appUser.mcpToken}`;
 
   return (
     <main className="min-h-screen bg-[#050505] text-white px-6 py-12">
@@ -55,15 +45,47 @@ export default async function ConnectPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="font-semibold">If you use the Claude desktop app</h2>
+          <h2 className="font-semibold">If you use the Claude desktop app or claude.ai</h2>
           <ol className="text-sm text-white/60 space-y-1 list-decimal list-inside">
-            <li>Open Settings, then Connectors, then Add custom connector.</li>
-            <li>Paste the details below.</li>
-            <li>
-              Ask Claude: <em>&ldquo;list the higgsfield models&rdquo;</em>.
-            </li>
+            <li>Open Settings, then Connectors, then <strong>Add custom connector</strong>.</li>
+            <li>Fill the form in using the four values below.</li>
+            <li>Click Add, then ask Claude: <em>&ldquo;list the higgsfield models&rdquo;</em>.</li>
           </ol>
-          <CopyBox value={desktopJson} multiline />
+
+          <dl className="space-y-3">
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-white/40 mb-1">Name</dt>
+              <dd><CopyBox value="Yahya AI Studio" /></dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-white/40 mb-1">
+                Remote MCP server URL
+              </dt>
+              <dd><CopyBox value={mcpUrl} /></dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-white/40 mb-1">
+                Authentication
+              </dt>
+              <dd className="text-sm text-white/70">
+                Choose <strong>None</strong>. This studio uses the key below rather than a
+                sign-in flow, so the other two options will not work.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs uppercase tracking-wider text-white/40 mb-1">
+                Additional request header
+              </dt>
+              <dd className="space-y-2">
+                <p className="text-sm text-white/70">
+                  Click <strong>Add header</strong>. Header name:
+                </p>
+                <CopyBox value="Authorization" />
+                <p className="text-sm text-white/70">Value:</p>
+                <CopyBox value={authHeader} />
+              </dd>
+            </div>
+          </dl>
         </section>
 
         <section className="rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-white/50">
