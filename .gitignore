@@ -31,3 +31,6 @@ lib/generated/
 .env.local
 .vercel
 .env*
+
+# Vendor agent skills installed by the Neon integration
+.agents/
