@@ -19,7 +19,7 @@ export default async function ConnectPage() {
     `--header "Authorization: Bearer ${appUser.mcpToken}"`;
 
   const mcpUrl = `${origin}/mcp`;
-  const authHeader = `Bearer ${appUser.mcpToken}`;
+  const mcpUrlWithToken = `${origin}/mcp/${appUser.mcpToken}`;
 
   return (
     <main className="min-h-screen bg-[#050505] text-white px-6 py-12">
@@ -61,28 +61,15 @@ export default async function ConnectPage() {
               <dt className="text-xs uppercase tracking-wider text-white/40 mb-1">
                 Remote MCP server URL
               </dt>
-              <dd><CopyBox value={mcpUrl} /></dd>
+              <dd><CopyBox value={mcpUrlWithToken} /></dd>
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wider text-white/40 mb-1">
                 Authentication
               </dt>
               <dd className="text-sm text-white/70">
-                Choose <strong>None</strong>. This studio uses the key below rather than a
-                sign-in flow, so the other two options will not work.
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wider text-white/40 mb-1">
-                Additional request header
-              </dt>
-              <dd className="space-y-2">
-                <p className="text-sm text-white/70">
-                  Click <strong>Add header</strong>. Header name:
-                </p>
-                <CopyBox value="Authorization" />
-                <p className="text-sm text-white/70">Value:</p>
-                <CopyBox value={authHeader} />
+                Choose <strong>None</strong>. Your key is already inside the address above, so
+                there is nothing else to fill in — leave the headers section empty.
               </dd>
             </div>
           </dl>
@@ -90,8 +77,9 @@ export default async function ConnectPage() {
 
         <section className="rounded-xl border border-white/10 bg-white/5 p-5 text-sm text-white/50">
           <p>
-            The line above contains your personal token. Do not share it — anyone who has it can
-            generate as you. If you think it has got out, ask the administrator to reset it.
+            Both lines above contain your personal key. Do not share them — anyone who has one
+            can generate as you, billed to the company. If you think it has got out, ask the
+            administrator to reset it.
           </p>
         </section>
 

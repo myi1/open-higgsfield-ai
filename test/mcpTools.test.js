@@ -15,6 +15,25 @@ const withAuth = (header) =>
   new Request('https://example.com/mcp', { headers: header ? { authorization: header } : {} });
 
 describe('authenticateMcp', () => {
+  it('accepts a token carried in the url path, for clients that cannot set headers', async () => {
+    findAppUserByMcpToken.mockResolvedValue(USER);
+    const req = new Request('https://example.com/mcp/ohf_from_path');
+    const user = await authenticateMcp(req, 'ohf_from_path');
+    expect(user.clerkUserId).toBe('u_1');
+    expect(findAppUserByMcpToken).toHaveBeenCalledWith('ohf_from_path');
+  });
+
+  it('prefers the header when both a header and a path token are present', async () => {
+    findAppUserByMcpToken.mockResolvedValue(USER);
+    await authenticateMcp(withAuth('Bearer ohf_from_header'), 'ohf_from_path');
+    expect(findAppUserByMcpToken).toHaveBeenCalledWith('ohf_from_header');
+  });
+
+  it('rejects an empty path token rather than querying', async () => {
+    expect(await authenticateMcp(withAuth(), '')).toBeNull();
+    expect(findAppUserByMcpToken).not.toHaveBeenCalled();
+  });
+
   it('rejects a request with no token', async () => {
     expect(await authenticateMcp(withAuth())).toBeNull();
     expect(findAppUserByMcpToken).not.toHaveBeenCalled();
