@@ -36,10 +36,11 @@ CRON_SECRET="$(openssl rand -hex 32)"
 
 set_env() {
   local name="$1" value="$2"
-  for target in production preview development; do
-    # Remove first so re-running the script is safe.
-    vercel env rm "$name" "$target" --yes >/dev/null 2>&1 || true
-    printf '%s' "$value" | vercel env add "$name" "$target" >/dev/null
+  # Production is the live site; development is for `vercel env pull` locally.
+  # Preview is deliberately skipped — preview builds would otherwise run against
+  # the live database and spend the live MuAPI key.
+  for target in production development; do
+    vercel env add "$name" "$target" --value "$value" --force --yes >/dev/null
   done
   echo "    set $name"
 }
