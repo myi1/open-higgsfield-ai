@@ -1,0 +1,60 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../lib/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum KeyMode {
+  COMPANY
+  SELF
+}
+
+enum Studio {
+  IMAGE
+  VIDEO
+  CINEMA
+  LIPSYNC
+}
+
+enum Via {
+  WEB
+  MCP
+}
+
+enum PaidBy {
+  COMPANY
+  SELF
+}
+
+model AppUser {
+  clerkUserId      String   @id
+  email            String
+  keyMode          KeyMode  @default(COMPANY)
+  ownKeyCiphertext String?
+  ownKeyLast4      String?
+  mcpToken         String   @unique
+  createdAt        DateTime @default(now())
+  lastUsedAt       DateTime @default(now())
+
+  generations Generation[]
+}
+
+model Generation {
+  id          String   @id
+  clerkUserId String
+  email       String
+  studio      Studio
+  model       String
+  via         Via
+  paidBy      PaidBy
+  createdAt   DateTime @default(now())
+
+  user AppUser @relation(fields: [clerkUserId], references: [clerkUserId])
+
+  @@index([clerkUserId, createdAt])
+  @@index([createdAt])
+}
