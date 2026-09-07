@@ -65,16 +65,19 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@vercel/blob": "^2.8.0",
     "axios": "^1.7.0",
+    "mcp-handler": "^2.1.1",
     "next": "^15.0.0",
     "pg": "^8.23.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.4.1",
-    "studio": "*"
+    "studio": "*",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
