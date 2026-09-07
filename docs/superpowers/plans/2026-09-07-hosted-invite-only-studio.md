@@ -3026,3 +3026,30 @@ Written down so they are decisions rather than oversights:
 - **Money in the admin, not counts.** Needs a hand-maintained price-per-model table; MuAPI publishes none.
 - **Moving to Vercel Pro.** Required before this is anything but a trial — the free plan is for non-commercial use, and its 60-second function limit is what forces the submit-then-check MCP pattern.
 - **Resetting someone's MCP token from the admin.** Today it needs a database edit. Worth adding the first time somebody leaks one.
+
+---
+
+## Execution notes (2026-09-07)
+
+Reality differed from the plan in three places. Recorded so nobody re-derives them.
+
+**Vitest must be pinned to v3.** Vitest 5 (current) requires Vite 6+; this repo pins
+Vite 5 for the Electron build, which the constraints forbid touching. `vitest@^3`
+peers Vite 5 and works. Task 3 Step 1 should read `npm install -D prisma "vitest@^3"`.
+
+**Prisma's `latest` npm tag is a release candidate** (8.0.0-rc.13 as of today). A plain
+`npm install -D prisma` installs an RC and mismatches `@prisma/client`. Pin both:
+`prisma@^7` and `@prisma/client@^7`.
+
+**Prisma 7 restructured the schema.** Three changes from what Task 3 Step 4 shows:
+- generator is `provider = "prisma-client"` (no `-js`) with a **required** `output`.
+  Using `output = "../lib/generated/prisma"` and `moduleFormat = "esm"`.
+- `url = env("DATABASE_URL")` is **no longer allowed** in the datasource block. The URL
+  moves to `prisma.config.mjs` for the CLI, and the running app supplies a driver
+  adapter (`@prisma/adapter-pg` + `pg`) to the `PrismaClient` constructor.
+- The generated client is **TypeScript**, so `typescript` and `@types/node` are now
+  devDependencies. Verified with a real `next build` that this compiles cleanly before
+  committing — the app's own code stays plain JavaScript.
+
+`lib/db.js` therefore imports from `./generated/prisma/client`, not `@prisma/client`,
+and `lib/generated/` is gitignored and rebuilt by `postinstall`.
