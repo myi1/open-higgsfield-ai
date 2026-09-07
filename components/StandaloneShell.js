@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { ImageStudio, VideoStudio, LipSyncStudio, CinemaStudio } from 'studio';
-import ApiKeyModal from './ApiKeyModal';
 
 const TABS = [
   { id: 'image',   label: 'Image Studio' },
@@ -11,28 +10,13 @@ const TABS = [
   { id: 'cinema',  label: 'Cinema Studio' },
 ];
 
-const STORAGE_KEY = 'muapi_key';
-
 export default function StandaloneShell() {
-  const [apiKey, setApiKey] = useState(null);
   const [activeTab, setActiveTab] = useState('image');
   const [showSettings, setShowSettings] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) setApiKey(stored);
-  }, []);
-
-  const handleKeySave = useCallback((key) => {
-    localStorage.setItem(STORAGE_KEY, key);
-    setApiKey(key);
-  }, []);
-
-  const handleKeyChange = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setApiKey(null);
   }, []);
 
   if (!hasMounted) return (
@@ -40,10 +24,6 @@ export default function StandaloneShell() {
       <div className="animate-spin text-[#d9ff00] text-3xl">◌</div>
     </div>
   );
-
-  if (!apiKey) {
-    return <ApiKeyModal onSave={handleKeySave} />;
-  }
 
   return (
     <div className="h-screen bg-[#050505] flex flex-col overflow-hidden">
@@ -83,10 +63,11 @@ export default function StandaloneShell() {
 
       {/* Studio Content */}
       <div className="flex-1">
-        {activeTab === 'image'   && <ImageStudio   apiKey={apiKey} />}
-        {activeTab === 'video'   && <VideoStudio   apiKey={apiKey} />}
-        {activeTab === 'lipsync' && <LipSyncStudio apiKey={apiKey} />}
-        {activeTab === 'cinema'  && <CinemaStudio  apiKey={apiKey} />}
+        {/* The prop is an origin tag, not a secret — the server holds the key. */}
+        {activeTab === 'image'   && <ImageStudio   apiKey="web:image" />}
+        {activeTab === 'video'   && <VideoStudio   apiKey="web:video" />}
+        {activeTab === 'lipsync' && <LipSyncStudio apiKey="web:lipsync" />}
+        {activeTab === 'cinema'  && <CinemaStudio  apiKey="web:cinema" />}
       </div>
 
       {/* Settings Modal */}
@@ -94,16 +75,15 @@ export default function StandaloneShell() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
           <div className="bg-[#111] border border-white/10 rounded-2xl p-8 w-full max-w-md">
             <h2 className="text-white font-bold text-xl mb-6">Settings</h2>
-            <p className="text-white/50 text-sm mb-4">
-              Current API key: <span className="text-white/80 font-mono">{apiKey.slice(0, 8)}••••••••</span>
-            </p>
+            <div className="flex flex-col gap-2 mb-6">
+              <a href="/settings" className="text-[#d9ff00] text-sm hover:underline">
+                Account settings
+              </a>
+              <a href="/connect" className="text-[#d9ff00] text-sm hover:underline">
+                Use from Claude
+              </a>
+            </div>
             <div className="flex gap-3">
-              <button
-                onClick={handleKeyChange}
-                className="flex-1 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm transition-colors"
-              >
-                Change API Key
-              </button>
               <button
                 onClick={() => setShowSettings(false)}
                 className="flex-1 py-2 rounded-lg bg-white/5 text-white hover:bg-white/10 text-sm transition-colors"
