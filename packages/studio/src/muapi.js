@@ -124,52 +124,19 @@ export async function processLipSync(apiKey, params) {
     return submitAndPoll(endpoint, payload, apiKey, params.onRequestId, 900);
 }
 
-export function uploadFile(apiKey, file, onProgress) {
-    return new Promise((resolve, reject) => {
-        const url = `${BASE_URL}/api/v1/upload_file`;
-        const formData = new FormData();
-        formData.append('file', file);
+export async function uploadFile(originTag, file, onProgress) {
+    // Files go straight to blob storage, so they are not limited by what a
+    // serverless function will accept in a request body. MuAPI is then handed
+    // the resulting public URL.
+    const { upload } = await import('@vercel/blob/client');
 
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', url);
-        xhr.setRequestHeader('x-ohf-origin', apiKey);
-
-        if (onProgress) {
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percentComplete = Math.round((event.loaded / event.total) * 100);
-                    onProgress(percentComplete);
-                }
-            };
-        }
-
-        xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    const data = JSON.parse(xhr.responseText);
-                    const fileUrl = data.url || data.file_url || data.data?.url;
-                    if (!fileUrl) {
-                        reject(new Error('No URL returned from file upload'));
-                    } else {
-                        resolve(fileUrl);
-                    }
-                } catch (e) {
-                    reject(new Error('Failed to parse upload response'));
-                }
-            } else {
-                let detail = xhr.statusText;
-                try {
-                    const errObj = JSON.parse(xhr.responseText);
-                    detail = errObj.detail || detail;
-                } catch (e) {
-                    // fallback to statusText
-                }
-                reject(new Error(`File upload failed: ${xhr.status} - ${detail}`));
-            }
-        };
-
-        xhr.onerror = () => reject(new Error('Network error during file upload'));
-        xhr.send(formData);
+    const blob = await upload(file.name, file, {
+        access: 'public',
+        handleUploadUrl: '/api/upload-token',
+        onUploadProgress: onProgress
+            ? ({ percentage }) => onProgress(Math.round(percentage))
+            : undefined,
     });
-}
 
+    return blob.url;
+}
