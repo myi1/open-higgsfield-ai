@@ -12,11 +12,13 @@ Put the Open Higgsfield AI studio on the internet at a permanent address, let a
 named group of people use it, and have the company pay for every generation —
 without any of those people ever holding the MuAPI key that spends the money.
 The same group must also be able to drive it from Claude over MCP, with setup
-simple enough for someone non-technical to complete unaided.
+simple enough for someone non-technical to complete unaided. A per-person switch
+in the admin decides whether someone spends the company's credits or their own.
 
 ### Non-goals
 
-- Charging users. Nobody pays; there is no billing, no plans, no credits UI.
+- Charging users. Nobody pays us; there is no billing, no plans, no credits UI.
+  Someone put on their own key pays MuAPI directly, never us.
 - Self-serve signup. Nobody gets in unless Yahya invites them.
 - Spend caps in v1 (explicitly declined — see §7).
 - Server-side storage of anyone's generation history. It stays in their browser,
@@ -56,6 +58,7 @@ Closing that gap is what this project is.
 | Database | **Neon Postgres** (Vercel integration) + Prisma | Free tier; Prisma matches existing tooling. |
 | Repo | **Fork to `myi1`** | `Autom8AI/Open-Higgsfield-AI` is not ours (read-only). |
 | MCP | **Hosted at `/mcp`**, personal bearer token | Everyone invited gets one. No install. |
+| Who pays | **Per person, set in admin** — company key or their own | Everyone defaults to the company key. |
 
 ### On `geopopos/higgsfield_ai_mcp`
 
@@ -135,14 +138,14 @@ the proxy. It is never sent to a browser, never committed, never logged.
 The only genuinely custom code in the project. One file.
 
 - **What it does:** receives the studio's API calls, refuses them if there is no
-  Clerk session, attaches `x-api-key` from `process.env.MUAPI_API_KEY`, forwards
-  to `https://api.muapi.ai/api/v1/<path>`, and returns the response untouched.
+  Clerk session, attaches the right `x-api-key` (see §5.8), forwards to
+  `https://api.muapi.ai/api/v1/<path>`, and returns the response untouched.
 - **How it's used:** the studio calls same-origin paths instead of MuAPI's domain.
   It is a drop-in — the URL shape `/api/v1/<endpoint>` is identical to upstream's.
 - **Handles:** `POST /api/v1/<model-endpoint>` (submit) and
   `GET|POST /api/v1/predictions/<id>/result` (poll).
 - **Logs:** on submit only — never on poll — one row per generation.
-- **Depends on:** Clerk session, `MUAPI_API_KEY`, Prisma.
+- **Depends on:** Clerk session, `MUAPI_API_KEY`, `KEY_ENCRYPTION_SECRET`, Prisma.
 
 ### 5.3 Usage log
 
@@ -157,6 +160,7 @@ Generation
   studio       enum     IMAGE | VIDEO | CINEMA | LIPSYNC
   model        string   (the endpoint slug, e.g. "flux-schnell-image")
   via          enum     WEB | MCP
+  paidBy       enum     COMPANY | SELF
   createdAt    timestamp
 ```
 
@@ -250,23 +254,69 @@ engineers.
 - **Revocation:** removing someone in Clerk kills their token on the next call,
   because every MCP request resolves the token to a live Clerk user.
 
-Token record:
-
-```
-ApiToken
-  id           string
-  clerkUserId  string   (unique — one token per person)
-  token        string   (unique, random, prefixed "ohf_")
-  createdAt    timestamp
-  lastUsedAt   timestamp
-  revokedAt    timestamp | null
-```
+The token lives on the person's record (§5.8), not in a table of its own — one
+row per person holds everything we know about them.
 
 **Uploads over MCP:** Claude will often have a local file. The MCP server accepts
 either a public URL or a base64 payload; base64 is written to Vercel Blob
 server-side and the resulting URL is passed on. Cap that path at 4.5MB and say so
 in the tool description, so Claude gives the user a clear message rather than a
 failure. Larger files go through the website.
+
+### 5.8 Who pays — company key or their own
+
+A switch in the admin, per person. Everything else about them is identical:
+same login, same studios, same MCP, same usage table. Only the account the
+generation is billed to changes.
+
+**The person record** — one row per invited person, holding everything:
+
+```
+AppUser
+  clerkUserId       string   (primary key)
+  email             string
+  keyMode           enum     COMPANY | SELF        (default COMPANY)
+  ownKeyCiphertext  string?  (AES-256-GCM, with its iv and auth tag)
+  ownKeyLast4       string?  (so they can recognise which key they saved)
+  mcpToken          string   (unique, random, prefixed "ohf_")
+  createdAt         timestamp
+  lastUsedAt        timestamp
+```
+
+**Choosing the key**, in the one place every generation passes through:
+
+1. Identify the caller — Clerk session (website) or `mcpToken` (MCP).
+2. `keyMode = COMPANY` → attach `process.env.MUAPI_API_KEY`, log `paidBy = COMPANY`.
+3. `keyMode = SELF` with a key saved → decrypt it, attach it, log `paidBy = SELF`.
+4. `keyMode = SELF` with **no** key saved → refuse with a plain message telling them
+   to add their key in Settings. Never quietly fall back to the company key; that
+   would hand the bill back to the company without anyone noticing.
+
+**Storing someone else's key.** This is the part that carries real responsibility,
+so it is spelled out rather than assumed:
+
+- Encrypted at rest with AES-256-GCM using `KEY_ENCRYPTION_SECRET`, a Vercel
+  environment variable separate from the MuAPI key. Node's built-in crypto; no
+  new dependency.
+- **Write-only from the browser.** Once saved, the settings page shows
+  `•••• <last4>` and a **Replace** button. There is no route that returns a
+  saved key to a browser, ever — not to the owner, not to the admin.
+- Never logged, never included in an error message, never echoed in a response.
+- One line on the settings page saying plainly what is stored and why.
+
+**In the admin**, each person's row gets a *Who pays* control — Company or Own —
+and the usage table separates the two totals, so "what this is costing me" stays
+an honest number. Switching someone to Own when they have not saved a key will
+stop them working, so the admin warns before the switch and shows an unmistakable
+marker on anyone in that state.
+
+**Why this exists.** Two real uses. Outside collaborators and agencies get the
+tool without you funding their output. And if one person's usage gets
+uncomfortable, you move them to their own key instead of cutting them off — the
+gentle version of the spend cap declined in §7. Note that a person on their own
+key needs their own MuAPI account with credits loaded, which someone
+non-technical will not manage unaided; the company key remains the right default
+for your own team.
 
 ---
 
@@ -315,6 +365,9 @@ deliberately left easy.
 | Database write fails | The generation still proceeds. Losing a log row must never cost the user their generation. Failures are logged for Yahya. |
 | Non-admin opens `/admin` | Redirected to the studio. The admin API returns 404, not 403 — no hint the page exists. |
 | MCP token unknown, revoked, or belongs to a removed Clerk user | 401 with a plain-English message telling them to reopen `/connect` and copy the line again. Never a raw protocol error. |
+| Person set to their own key but hasn't saved one | Refused with "add your MuAPI key in Settings", on both the website and MCP. Never falls back to the company key. |
+| Someone's own key is invalid or out of credits | MuAPI's own message is passed through, prefixed so they know it is *their* account, not the company's. |
+| `KEY_ENCRYPTION_SECRET` missing or rotated | Saved keys fail to decrypt; those people are refused with "re-save your key" rather than silently billed to the company. |
 | MCP file over 4.5MB | Refused with a message naming the size limit and pointing at the website. |
 | A video job is still running when `check_generation` is called | Returns "still working, try again shortly" rather than an error, so Claude waits instead of giving up. |
 
@@ -344,6 +397,10 @@ Proportionate — the repo ships no tests and this does not become a test projec
   request reaches MuAPI with the key attached; a submit writes exactly one usage
   row; a poll writes none; a database failure does not fail the generation.
 - **Admin test (automated):** a non-admin session cannot read the usage API.
+- **Key-selection tests (automated):** a COMPANY person is billed to the company
+  key; a SELF person with a saved key is billed to theirs and logged `paidBy=SELF`;
+  a SELF person with no key is refused and **never** falls back to the company key;
+  no route anywhere returns a saved key to a browser.
 - **MCP tests (automated):** a request with no token is refused; a valid token
   resolves to the right person and writes a usage row marked `MCP`; a revoked
   token is refused; a generate tool returns a job id without blocking.
@@ -367,6 +424,7 @@ That last check is the one that matters. It is the whole point of the project.
 | Fork drift — upstream changes `muapi.js` and conflicts with our patch | Patch confined to one file and four touch points; the diff stays readable. |
 | Vercel Hobby terms | Flagged; move to Pro once past trial. |
 | Claude Desktop may require OAuth for a hosted MCP rather than a pasted token | Verify early. Claude Code accepts a bearer token today. If Desktop cannot, the `/connect` page shows Desktop users a small local wrapper instead — the fallback declined in the design, kept in reserve. |
+| We now hold other people's MuAPI keys | Encrypted at rest with a separate secret, write-only from the browser, never logged or returned. The blast radius of a leak is their MuAPI credits, and they can replace the key themselves. |
 | A personal token leaks | It spends credits and nothing else, and Regenerate is one click. Usage attribution makes a leak visible in the admin table. |
 | MuAPI result URLs may expire | Users should download what they want to keep. Confirm the expiry window and, if short, say so in the UI. |
 | A user pastes confidential material into a prompt | Prompts are not stored server-side by design. Worth one line in the invite email about what this tool is and isn't for. |
@@ -386,9 +444,11 @@ That last check is the one that matters. It is the whole point of the project.
 6. Neon + the usage log.
 7. Blob uploads.
 8. The `/admin` page.
-9. Personal tokens, the `/mcp` server, and the `/connect` page.
-10. The daily email.
-11. Smoke test all four studios and the MCP setup end to end, then invite people.
+9. The who-pays switch: person records, encrypted key storage, the settings box,
+   the admin control.
+10. Personal tokens, the `/mcp` server, and the `/connect` page.
+11. The daily email.
+12. Smoke test all four studios and the MCP setup end to end, then invite people.
 
 Steps 1–5 are the product. Step 9 is the second front door. The rest is
 instrumentation.
