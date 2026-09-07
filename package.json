@@ -76,6 +76,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hot-toast": "^2.4.1",
+    "resend": "^6.26.0",
     "studio": "*",
     "zod": "^4.5.4"
   },
