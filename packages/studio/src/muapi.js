@@ -1,6 +1,9 @@
 import { getModelById, getVideoModelById, getI2IModelById, getI2VModelById, getV2VModelById, getLipSyncModelById } from './models.js';
 
-const BASE_URL = 'https://api.muapi.ai';
+// Calls go to our own server, which attaches the MuAPI key. The `key` argument
+// threaded through every function below is now an origin tag ("web:image"),
+// not a secret — see docs/superpowers/specs/2026-09-07-*-design.md.
+const BASE_URL = '';
 
 async function pollForResult(requestId, key, maxAttempts = 900, interval = 2000) {
     const pollUrl = `${BASE_URL}/api/v1/predictions/${requestId}/result`;
@@ -8,7 +11,7 @@ async function pollForResult(requestId, key, maxAttempts = 900, interval = 2000)
         await new Promise(resolve => setTimeout(resolve, interval));
         try {
             const response = await fetch(pollUrl, {
-                headers: { 'Content-Type': 'application/json', 'x-api-key': key }
+                headers: { 'Content-Type': 'application/json', 'x-ohf-origin': key }
             });
             if (!response.ok) {
                 const errText = await response.text();
@@ -30,7 +33,7 @@ async function submitAndPoll(endpoint, payload, key, onRequestId, maxAttempts = 
     const url = `${BASE_URL}/api/v1/${endpoint}`;
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': key },
+        headers: { 'Content-Type': 'application/json', 'x-ohf-origin': key },
         body: JSON.stringify(payload)
     });
     if (!response.ok) {
@@ -129,7 +132,7 @@ export function uploadFile(apiKey, file, onProgress) {
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url);
-        xhr.setRequestHeader('x-api-key', apiKey);
+        xhr.setRequestHeader('x-ohf-origin', apiKey);
 
         if (onProgress) {
             xhr.upload.onprogress = (event) => {
