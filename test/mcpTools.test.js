@@ -83,6 +83,24 @@ describe('runTool', () => {
     expect(out.content[0].text).toMatch(/still working/i);
   });
 
+  it('check_generation reports a refusal instead of "still working"', async () => {
+    forwardToMuapi.mockResolvedValue({ status: 404, body: { error: 'No such prediction.' } });
+
+    const out = await runTool({ appUser: USER, tool: 'check_generation', args: { request_id: 'nope' } });
+
+    expect(out.content[0].text).toBe('No such prediction.');
+  });
+
+  it('flattens a MuAPI error object into plain text', async () => {
+    forwardToMuapi.mockResolvedValue({
+      status: 403, body: { detail: 'Not authorized', error: { code: 'FORBIDDEN', message: 'Not authorized' } },
+    });
+
+    const out = await runTool({ appUser: USER, tool: 'generate_image', args: { prompt: 'x', model: 'nano-banana' } });
+
+    expect(out.content[0].text).toBe('Not authorized');
+  });
+
   it('check_generation returns the result url when it is done', async () => {
     forwardToMuapi.mockResolvedValue({
       status: 200, body: { status: 'completed', outputs: [{ url: 'https://cdn/x.png' }] },
@@ -101,6 +119,23 @@ describe('runTool', () => {
     const out = await runTool({ appUser: USER, tool: 'generate_image', args: { prompt: 'x', model: 'nano-banana' } });
 
     expect(out.content[0].text).toMatch(/own MuAPI key/);
+  });
+
+  it('gives up on a hung MuAPI submit and says the job may still have started', async () => {
+    forwardToMuapi.mockRejectedValue(Object.assign(new Error('timed out'), { name: 'TimeoutError' }));
+
+    const out = await runTool({ appUser: USER, tool: 'generate_image', args: { prompt: 'x', model: 'nano-banana' } });
+
+    expect(forwardToMuapi.mock.calls[0][0].signal).toBeInstanceOf(AbortSignal);
+    expect(out.content[0].text).toMatch(/may still have started/);
+  });
+
+  it('gives up on a hung status check and asks to check again', async () => {
+    forwardToMuapi.mockRejectedValue(Object.assign(new Error('timed out'), { name: 'TimeoutError' }));
+
+    const out = await runTool({ appUser: USER, tool: 'check_generation', args: { request_id: 'req_1' } });
+
+    expect(out.content[0].text).toMatch(/check again/i);
   });
 
   it('list_models names models for each studio without calling MuAPI', async () => {

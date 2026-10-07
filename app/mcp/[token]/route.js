@@ -1,5 +1,8 @@
 import { handleMcpRequest } from '@/lib/mcpServer';
 
+// See app/mcp/route.js.
+export const maxDuration = 60;
+
 // Claude's desktop connector reserves the Authorization header for its own OAuth
 // flow, so the token travels in the path instead. Same authentication, same
 // tools, same usage logging as the header route.
